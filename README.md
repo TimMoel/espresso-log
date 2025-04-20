@@ -15,8 +15,8 @@ A Streamlit-based web application for logging and tracking espresso brewing para
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/espresso_log.git
-cd espresso_log
+git clone https://github.com/TimMoel/espresso-log.git
+cd espresso-log
 ```
 
 2. Install the required packages:
