@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import os
 
 # Initialize session state
 if 'current_session' not in st.session_state:
@@ -23,17 +22,13 @@ if 'current_session' not in st.session_state:
         'favorite': False
     }
 
-# Load or create CSV file
-CSV_FILE = 'brew_log.csv'
-if not os.path.exists(CSV_FILE):
-    df = pd.DataFrame(columns=[
+# Initialize brew history in session state
+if 'brew_history' not in st.session_state:
+    st.session_state.brew_history = pd.DataFrame(columns=[
         'timestamp', 'bean_name', 'grinder', 'dose', 'grind_size', 'pre_infusion_time',
         'yield', 'shot_time', 'sourness', 'bitterness', 'sweetness', 'body',
         'overall_satisfaction', 'notes', 'suggestions', 'favorite'
     ])
-    df.to_csv(CSV_FILE, index=False)
-else:
-    df = pd.read_csv(CSV_FILE)
 
 # Function to get brew suggestions
 def get_brew_suggestions(session):
@@ -168,40 +163,32 @@ if 'brewing' in st.session_state and st.session_state.brewing:
             }
             st.table(pd.DataFrame(current_values))
         
-        # Save to CSV
+        # Save to session state
         new_row = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            **{k: v for k, v in st.session_state.current_session.items() if k != 'favorite'},
-            'suggestions': suggestions,
-            'favorite': st.session_state.current_session['favorite']
+            **st.session_state.current_session,
+            'suggestions': suggestions
         }
         
-        # Read the current CSV file to get the latest data
-        if os.path.exists(CSV_FILE):
-            df = pd.read_csv(CSV_FILE)
-        else:
-            df = pd.DataFrame(columns=[
-                'timestamp', 'bean_name', 'grinder', 'dose', 'grind_size', 'pre_infusion_time',
-                'yield', 'shot_time', 'sourness', 'bitterness', 'sweetness', 'body',
-                'overall_satisfaction', 'notes', 'suggestions', 'favorite'
-            ])
+        st.session_state.brew_history = pd.concat([
+            st.session_state.brew_history,
+            pd.DataFrame([new_row])
+        ], ignore_index=True)
         
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-        df.to_csv(CSV_FILE, index=False)
         st.success("Session saved to log!")
-        st.session_state.brewing = False  # Reset brewing state
-        st.rerun()  # Rerun the app to show the updated table
+        st.session_state.brewing = False
+        st.rerun()
 
 # Historical Brews Table
 st.header("3. Historical Brews")
-if not df.empty:
+if not st.session_state.brew_history.empty:
     # Add a selection column for deletion
-    if 'selected_for_deletion' not in df.columns:
-        df['selected_for_deletion'] = False
+    if 'selected_for_deletion' not in st.session_state.brew_history.columns:
+        st.session_state.brew_history['selected_for_deletion'] = False
     
     # Reorder columns to put favorite and selection first
-    column_order = ['selected_for_deletion', 'favorite'] + [col for col in df.columns if col not in ['selected_for_deletion', 'favorite']]
-    df_display = df[column_order]
+    column_order = ['selected_for_deletion', 'favorite'] + [col for col in st.session_state.brew_history.columns if col not in ['selected_for_deletion', 'favorite']]
+    df_display = st.session_state.brew_history[column_order]
     
     edited_df = st.data_editor(
         df_display.sort_values('timestamp', ascending=False),
@@ -245,11 +232,13 @@ if not df.empty:
     with col1:
         if st.button("Select All", use_container_width=True):
             edited_df['selected_for_deletion'] = True
+            st.session_state.brew_history = edited_df.drop('selected_for_deletion', axis=1)
             st.rerun()
     
     with col2:
         if st.button("Deselect All", use_container_width=True):
             edited_df['selected_for_deletion'] = False
+            st.session_state.brew_history = edited_df.drop('selected_for_deletion', axis=1)
             st.rerun()
     
     with col3:
@@ -258,25 +247,23 @@ if not df.empty:
         if selected_count > 0:
             if st.button(f"Delete Selected ({selected_count} records)", use_container_width=True):
                 # Keep only unselected records
-                df = edited_df[edited_df['selected_for_deletion'] == False].drop('selected_for_deletion', axis=1)
-                df.to_csv(CSV_FILE, index=False)
+                st.session_state.brew_history = edited_df[edited_df['selected_for_deletion'] == False].drop('selected_for_deletion', axis=1)
                 st.success(f"{selected_count} records deleted successfully!")
                 st.rerun()
     
-    # Update favorites in the original dataframe
-    df['favorite'] = edited_df['favorite']
-    df.to_csv(CSV_FILE, index=False)
+    # Update favorites in the history
+    st.session_state.brew_history['favorite'] = edited_df['favorite']
     
     # Load previous session
     st.subheader("Load Previous Session")
     selected_index = st.selectbox(
         "Select a session to load",
-        range(len(df)),
-        format_func=lambda x: f"{df.iloc[x]['bean_name']} - {df.iloc[x]['timestamp']}"
+        range(len(st.session_state.brew_history)),
+        format_func=lambda x: f"{st.session_state.brew_history.iloc[x]['bean_name']} - {st.session_state.brew_history.iloc[x]['timestamp']}"
     )
     
     if st.button("Load Selected Session"):
-        selected_session = df.iloc[selected_index]
+        selected_session = st.session_state.brew_history.iloc[selected_index]
         for key in st.session_state.current_session:
             if key in selected_session:
                 st.session_state.current_session[key] = selected_session[key]
