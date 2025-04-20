@@ -96,9 +96,9 @@ with col2:
     st.session_state.current_session['shot_time'] = st.number_input("Shot Time (s)", min_value=0.0, max_value=60.0, value=st.session_state.current_session['shot_time'], step=0.1)
 
 # Save & Brew button
-if st.button("Save & Brew"):
+if st.button("Brew & Review"):
     st.session_state.brewing = True
-    st.success("Session saved! Now you can rate your brew.")
+    st.success("Parameters saved! Now you can brew and rate your shot.")
     st.rerun()
 
 # Post-Brew Rating Section
@@ -149,6 +149,7 @@ if 'brewing' in st.session_state and st.session_state.brewing:
     st.session_state.current_session['notes'] = st.text_area("Notes", value=st.session_state.current_session['notes'])
     st.session_state.current_session['favorite'] = st.checkbox("Mark as Favorite", value=st.session_state.current_session['favorite'])
     
+    # Get Suggestions button
     if st.button("Get Suggestions"):
         suggestions, changes = get_brew_suggestions(st.session_state.current_session)
         st.info(suggestions)
@@ -162,7 +163,10 @@ if 'brewing' in st.session_state and st.session_state.brewing:
                 'Suggested': [changes[k] for k in changes.keys()]
             }
             st.table(pd.DataFrame(current_values))
-        
+    
+    # Save button
+    if st.button("Save to History"):
+        suggestions, _ = get_brew_suggestions(st.session_state.current_session)
         # Save to session state
         new_row = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
